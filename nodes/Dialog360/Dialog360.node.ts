@@ -6,16 +6,17 @@ import type {
 	INodePropertyOptions,
 	INodeType,
 	INodeTypeDescription,
+	ResourceMapperFields,
 } from 'n8n-workflow';
 import { NodeApiError, NodeConnectionTypes, NodeOperationError } from 'n8n-workflow';
 
 import {
 	buildComponents,
 	dialog360ApiRequest,
+	fetchApprovedTemplates,
 	normalizePhone,
 	simplifySendResponse,
-	type TemplateDef,
-	type TemplateInputs,
+	templateFieldDescriptors,
 } from './GenericFunctions';
 
 // Programmatic style: Send Template requires dependent API calls (fetch the
@@ -258,120 +259,35 @@ export class Dialog360 implements INodeType {
 				},
 			},
 			{
-				displayName: 'Body Variables',
-				name: 'bodyVariables',
-				type: 'fixedCollection',
+				displayName: 'Template Fields',
+				name: 'templateFields',
+				type: 'resourceMapper',
+				noDataExpression: true,
+				default: {
+					mappingMode: 'defineBelow',
+					value: null,
+				},
+				required: true,
 				typeOptions: {
-					multipleValues: true,
+					loadOptionsDependsOn: ['template'],
+					resourceMapper: {
+						resourceMapperMethod: 'getTemplateFields',
+						mode: 'add',
+						addAllFields: true,
+						supportAutoMap: false,
+						hideNoDataError: true,
+						fieldWords: {
+							singular: 'template field',
+							plural: 'template fields',
+						},
+					},
 				},
-				default: {},
-				placeholder: 'Add Variable',
-				description:
-					'Values for the template body variables, in order. For templates with named variables ({{order_id}}), set the matching name.',
 				displayOptions: {
 					show: {
 						resource: ['message'],
 						operation: ['sendTemplate'],
 					},
 				},
-				options: [
-					{
-						displayName: 'Variable',
-						name: 'variables',
-						values: [
-							{
-								displayName: 'Name',
-								name: 'name',
-								type: 'string',
-								default: '',
-								description:
-									'Only needed for named variables like {{order_id}}. Leave empty for positional variables like {{1}}.',
-							},
-							{
-								displayName: 'Value',
-								name: 'value',
-								type: 'string',
-								default: '',
-							},
-						],
-					},
-				],
-			},
-			{
-				displayName: 'Header Text Variable',
-				name: 'headerTextVariable',
-				type: 'string',
-				default: '',
-				description: 'Value for the header text variable, if the template header has one',
-				displayOptions: {
-					show: {
-						resource: ['message'],
-						operation: ['sendTemplate'],
-					},
-				},
-			},
-			{
-				displayName: 'Header Media URL',
-				name: 'headerMediaUrl',
-				type: 'string',
-				default: '',
-				placeholder: 'e.g. https://example.com/header.jpg',
-				description:
-					'Publicly reachable HTTPS URL for the header media, if the template has an image, video or document header',
-				displayOptions: {
-					show: {
-						resource: ['message'],
-						operation: ['sendTemplate'],
-					},
-				},
-			},
-			{
-				displayName: 'Button Parameters',
-				name: 'buttonParameters',
-				type: 'fixedCollection',
-				typeOptions: {
-					multipleValues: true,
-				},
-				default: {},
-				placeholder: 'Add Button Parameter',
-				description: 'Values for dynamic URL buttons and copy-code coupon buttons',
-				displayOptions: {
-					show: {
-						resource: ['message'],
-						operation: ['sendTemplate'],
-					},
-				},
-				options: [
-					{
-						displayName: 'Parameter',
-						name: 'parameters',
-						values: [
-							{
-								displayName: 'Button Index',
-								name: 'index',
-								type: 'number',
-								default: 0,
-								description: 'Position of the button in the template, starting at 0',
-							},
-							{
-								displayName: 'Type',
-								name: 'type',
-								type: 'options',
-								options: [
-									{ name: 'Copy Code', value: 'copyCode' },
-									{ name: 'URL Variable', value: 'url' },
-								],
-								default: 'url',
-							},
-							{
-								displayName: 'Value',
-								name: 'value',
-								type: 'string',
-								default: '',
-							},
-						],
-					},
-				],
 			},
 		],
 	};
@@ -379,15 +295,40 @@ export class Dialog360 implements INodeType {
 	methods = {
 		loadOptions: {
 			async getTemplates(this: ILoadOptionsFunctions): Promise<INodePropertyOptions[]> {
-				const response = await dialog360ApiRequest.call(this, 'GET', '/v1/configs/templates');
-				const templates = (response.waba_templates as TemplateDef[] | undefined) ?? [];
+				const templates = await fetchApprovedTemplates.call(this);
 				return templates
-					.filter((t) => String(t.status).toLowerCase() === 'approved')
 					.map((t) => ({
 						name: `${t.name} — ${t.language} (${t.category ?? 'template'})`,
 						value: `${t.name}|${t.language}`,
 					}))
 					.sort((a, b) => a.name.localeCompare(b.name));
+			},
+		},
+		resourceMapping: {
+			// Regenerates the Template Fields inputs whenever the selected
+			// template changes (loadOptionsDependsOn: ['template']).
+			async getTemplateFields(this: ILoadOptionsFunctions): Promise<ResourceMapperFields> {
+				const composite = this.getNodeParameter('template', '') as string;
+				if (!composite) {
+					return { fields: [] };
+				}
+				const [name, language] = composite.split('|');
+				const templates = await fetchApprovedTemplates.call(this);
+				const templateDef = templates.find((t) => t.name === name && t.language === language);
+				if (!templateDef) {
+					return { fields: [] };
+				}
+				return {
+					fields: templateFieldDescriptors(templateDef).map((f) => ({
+						id: f.id,
+						displayName: f.label,
+						required: f.required,
+						defaultMatch: false,
+						display: true,
+						canBeUsedToMatch: false,
+						type: 'string',
+					})),
+				};
 			},
 		},
 	};
@@ -440,17 +381,9 @@ export class Dialog360 implements INodeType {
 						const composite = this.getNodeParameter('template', i) as string;
 						const [name, language] = composite.split('|');
 
-						const listResponse = await dialog360ApiRequest.call(
-							this,
-							'GET',
-							'/v1/configs/templates',
-						);
-						const templates = (listResponse.waba_templates as TemplateDef[] | undefined) ?? [];
+						const templates = await fetchApprovedTemplates.call(this);
 						const templateDef = templates.find(
-							(t) =>
-								t.name === name &&
-								t.language === language &&
-								String(t.status).toLowerCase() === 'approved',
+							(t) => t.name === name && t.language === language,
 						);
 						if (!templateDef) {
 							throw new NodeOperationError(
@@ -460,25 +393,10 @@ export class Dialog360 implements INodeType {
 							);
 						}
 
-						const bodyVariablesCollection = this.getNodeParameter(
-							'bodyVariables',
-							i,
-							{},
-						) as IDataObject;
-						const buttonParametersCollection = this.getNodeParameter(
-							'buttonParameters',
-							i,
-							{},
-						) as IDataObject;
-						const inputs: TemplateInputs = {
-							bodyVariables: (bodyVariablesCollection.variables as TemplateInputs['bodyVariables']) ?? [],
-							headerTextVariable: this.getNodeParameter('headerTextVariable', i, '') as string,
-							headerMediaUrl: this.getNodeParameter('headerMediaUrl', i, '') as string,
-							buttonParameters:
-								(buttonParametersCollection.parameters as TemplateInputs['buttonParameters']) ?? [],
-						};
+						const mapper = this.getNodeParameter('templateFields', i, {}) as IDataObject;
+						const values = (mapper.value ?? {}) as Record<string, string>;
 
-						const components = buildComponents(templateDef, inputs);
+						const components = buildComponents(templateDef, values);
 						const template: IDataObject = { name, language: { code: language } };
 						if (components.length) {
 							template.components = components;

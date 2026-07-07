@@ -27,7 +27,7 @@ The **360dialog** node supports:
 
 - **Send Text** — plain text message with an optional link preview.
 - **Send Media** — image, video, document or audio from a publicly reachable HTTPS URL, with optional caption and (for documents) filename.
-- **Send Template** — approved template messages, usable outside the 24-hour customer service window. Pick the template from a live dropdown (approved templates only, one entry per name + language). Supply body variables (positional `{{1}}` or named `{{order_id}}`), a header text variable or header media URL, and dynamic URL button / copy-code coupon values. The node fetches the template definition and assembles Meta's `components[]` payload for you — URL button values are percent-encoded automatically.
+- **Send Template** — approved template messages, usable outside the 24-hour customer service window. Pick the template from a live dropdown (approved templates only, one entry per name + language) and the node generates the input fields automatically from the template definition (`/message_templates`): one field per body variable (positional `{{1}}` or named `{{order_id}}`), header text variable or header media URL, and dynamic URL button / copy-code coupon values. Meta's `components[]` payload is assembled for you — URL button values are percent-encoded automatically.
 
 ### Account
 
