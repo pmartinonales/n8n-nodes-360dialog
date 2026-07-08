@@ -76,19 +76,39 @@ export function normalizePhone(raw: string): string {
 }
 
 // Business-Scoped User ID: XX.<18-20 digits>, or XX.ENT.<digits> for parent
-// BSUIDs. Unambiguous vs phone numbers, so the recipient field auto-detects.
+// BSUIDs.
 export function isBsuid(value: string): boolean {
 	return /^[A-Z]{2}\.(ENT\.)?\d+$/i.test(String(value ?? '').trim());
 }
 
-// POST /messages addresses phones via `to` and BSUIDs via `recipient`
-// (if both were present, `to` would win — so exactly one is set).
-export function recipientFields(rawRecipient: string): IDataObject {
-	const value = String(rawRecipient ?? '').trim();
-	if (isBsuid(value)) {
-		return { recipient: value };
+// POST /messages addresses phones via `to` and/or BSUIDs via `recipient`;
+// at least one must be provided (when both are set, the API lets `to` win).
+// Returns the payload fields, or an error string describing what's wrong.
+export function recipientFields(
+	rawTo: string,
+	rawRecipient: string,
+): { fields?: IDataObject; error?: string } {
+	const to = normalizePhone(String(rawTo ?? '').trim());
+	const recipient = String(rawRecipient ?? '').trim();
+
+	if (!to && !recipient) {
+		return { error: 'Provide a phone number ("To") and/or a user ID ("Recipient")' };
 	}
-	return { to: normalizePhone(value) };
+	if (to && !/^\d+$/.test(to)) {
+		return {
+			error: `"To" must be a phone number in international format, digits only (got "${rawTo}"). User IDs (BSUIDs) go into the "Recipient" field.`,
+		};
+	}
+	if (recipient && !isBsuid(recipient)) {
+		return {
+			error: `"Recipient" must be a Business-Scoped User ID like BR.13491208655302741918 (got "${rawRecipient}"). Phone numbers go into the "To" field.`,
+		};
+	}
+
+	const fields: IDataObject = {};
+	if (to) fields.to = to;
+	if (recipient) fields.recipient = recipient;
+	return { fields };
 }
 
 // WhatsApp webhooks carry timestamps as Unix epoch seconds.

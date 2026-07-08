@@ -121,14 +121,27 @@ export class Dialog360 implements INodeType {
 			//         shared: recipient
 			// ----------------------------------
 			{
-				displayName: 'Recipient',
+				displayName: 'To (Phone Number)',
 				name: 'to',
 				type: 'string',
-				required: true,
 				default: '',
-				placeholder: 'e.g. 491701234567 or BR.13491208655302741918',
+				placeholder: 'e.g. 491701234567',
 				description:
-					'Phone number in international format (digits only; +, spaces and dashes are stripped automatically) or a Business-Scoped User ID (BSUID, e.g. BR.13491208655302741918) for users whose phone number is hidden. The format is detected automatically.',
+					'Recipient phone number in international format, digits only (+, spaces and dashes are stripped automatically). Provide this, a Recipient user ID, or both — when both are set, the phone number takes precedence.',
+				displayOptions: {
+					show: {
+						resource: ['message'],
+					},
+				},
+			},
+			{
+				displayName: 'Recipient (User ID)',
+				name: 'recipient',
+				type: 'string',
+				default: '',
+				placeholder: 'e.g. BR.13491208655302741918',
+				description:
+					'Business-Scoped User ID (BSUID) of the recipient, for users whose phone number is hidden behind a WhatsApp username. Provide this, a phone number, or both.',
 				displayOptions: {
 					show: {
 						resource: ['message'],
@@ -346,7 +359,13 @@ export class Dialog360 implements INodeType {
 				if (resource === 'account' && operation === 'getHealthStatus') {
 					responseData = await dialog360ApiRequest.call(this, 'GET', '/health_status');
 				} else if (resource === 'message') {
-					const recipient = recipientFields(this.getNodeParameter('to', i) as string);
+					const { fields: recipient, error: recipientError } = recipientFields(
+						this.getNodeParameter('to', i, '') as string,
+						this.getNodeParameter('recipient', i, '') as string,
+					);
+					if (recipientError) {
+						throw new NodeOperationError(this.getNode(), recipientError, { itemIndex: i });
+					}
 
 					if (operation === 'sendText') {
 						responseData = await dialog360ApiRequest.call(this, 'POST', '/messages', {
