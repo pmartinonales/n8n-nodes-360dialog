@@ -1,5 +1,5 @@
 {
-  "name": "n8n-nodes-360dialog",
+  "name": "@pmartino/n8n-nodes-360dialog",
   "version": "0.1.0",
   "description": "360dialog WhatsApp Messaging API community node for n8n: send text, media and template messages, and trigger workflows on inbound WhatsApp messages",
   "license": "MIT",

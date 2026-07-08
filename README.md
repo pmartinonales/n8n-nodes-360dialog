@@ -13,7 +13,7 @@ This is an n8n community node for the [360dialog](https://www.360dialog.com/) Wh
 
 ## Installation
 
-Follow the [installation guide](https://docs.n8n.io/integrations/community-nodes/installation/) in the n8n community nodes documentation. The package name is `n8n-nodes-360dialog`.
+Follow the [installation guide](https://docs.n8n.io/integrations/community-nodes/installation/) in the n8n community nodes documentation. The package name is `@pmartino/n8n-nodes-360dialog`.
 
 ## Credentials
 
