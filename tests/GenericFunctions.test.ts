@@ -1,3 +1,4 @@
+/* eslint-disable @n8n/community-nodes/no-restricted-imports -- vitest is a devDependency; tests are excluded from the published package (files: ["dist"]) */
 import { describe, expect, it } from 'vitest';
 
 import {
