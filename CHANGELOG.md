@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.0
+
+- First release published via GitHub Actions with npm provenance (required for n8n Cloud verification).
+- Split the recipient input into explicit To (phone number) and Recipient (BSUID) fields on all send operations — one or both required.
+- Added a vitest suite (`npm run test`) covering recipient routing, template field generation, components[] assembly, BSUID webhook parsing, echo filtering and dedupe.
+
 ## 0.1.0
 
 Initial release.
