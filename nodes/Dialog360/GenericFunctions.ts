@@ -25,11 +25,27 @@ export async function dialog360ApiRequest(
 			json: true,
 		})) as IDataObject;
 	} catch (error) {
+		const causeText = JSON.stringify((error as JsonObject).cause ?? {});
 		// 131047: free-form message outside the 24h customer service window.
-		if (JSON.stringify((error as JsonObject).cause ?? {}).includes('131047')) {
+		if (causeText.includes('131047')) {
 			throw new NodeApiError(this.getNode(), error as JsonObject, {
 				message: 'The 24-hour customer service window for this recipient has closed',
 				description: 'Use the Send Template operation to re-engage this recipient.',
+			});
+		}
+		// 131009: malformed, foreign-portfolio or retired BSUID.
+		if (causeText.includes('131009')) {
+			throw new NodeApiError(this.getNode(), error as JsonObject, {
+				message: 'The recipient identifier was rejected (error 131009)',
+				description:
+					'If you sent to a user ID (BSUID), it may be malformed, belong to another business portfolio, or have been retired by a phone change. Re-resolve the identity — watch for "system" events on the 360dialog Trigger announcing a new user ID.',
+			});
+		}
+		// 131062: authentication templates cannot be sent to a BSUID.
+		if (causeText.includes('131062')) {
+			throw new NodeApiError(this.getNode(), error as JsonObject, {
+				message: 'Authentication templates cannot be sent to a user ID (error 131062)',
+				description: 'Address this recipient by phone number to send authentication templates.',
 			});
 		}
 		// Surface 360dialog's own error text instead of a generic status message.
@@ -57,6 +73,22 @@ export async function dialog360ApiRequest(
 // WhatsApp expects digits only: no +, spaces, dashes or parentheses.
 export function normalizePhone(raw: string): string {
 	return String(raw ?? '').replace(/[+\s\-()]/g, '');
+}
+
+// Business-Scoped User ID: XX.<18-20 digits>, or XX.ENT.<digits> for parent
+// BSUIDs. Unambiguous vs phone numbers, so the recipient field auto-detects.
+export function isBsuid(value: string): boolean {
+	return /^[A-Z]{2}\.(ENT\.)?\d+$/i.test(String(value ?? '').trim());
+}
+
+// POST /messages addresses phones via `to` and BSUIDs via `recipient`
+// (if both were present, `to` would win — so exactly one is set).
+export function recipientFields(rawRecipient: string): IDataObject {
+	const value = String(rawRecipient ?? '').trim();
+	if (isBsuid(value)) {
+		return { recipient: value };
+	}
+	return { to: normalizePhone(value) };
 }
 
 // WhatsApp webhooks carry timestamps as Unix epoch seconds.
@@ -274,6 +306,8 @@ export function buildComponents(
 }
 
 // Flattens a message send response, exposing the ids downstream steps need.
+// Phone-addressed sends return contacts[0].wa_id, BSUID-addressed sends
+// return contacts[0].user_id — never both.
 export function simplifySendResponse(response: IDataObject): IDataObject {
 	const messages = response.messages as IDataObject[] | undefined;
 	const contacts = response.contacts as IDataObject[] | undefined;
@@ -281,5 +315,6 @@ export function simplifySendResponse(response: IDataObject): IDataObject {
 		...response,
 		messageId: messages?.[0]?.id,
 		waId: contacts?.[0]?.wa_id,
+		userId: contacts?.[0]?.user_id,
 	};
 }

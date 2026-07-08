@@ -14,7 +14,7 @@ import {
 	buildComponents,
 	dialog360ApiRequest,
 	fetchApprovedTemplates,
-	normalizePhone,
+	recipientFields,
 	simplifySendResponse,
 	templateFieldDescriptors,
 } from './GenericFunctions';
@@ -121,14 +121,14 @@ export class Dialog360 implements INodeType {
 			//         shared: recipient
 			// ----------------------------------
 			{
-				displayName: 'Recipient Phone Number',
+				displayName: 'Recipient',
 				name: 'to',
 				type: 'string',
 				required: true,
 				default: '',
-				placeholder: 'e.g. 491701234567',
+				placeholder: 'e.g. 491701234567 or BR.13491208655302741918',
 				description:
-					'Full number in international format, digits only, no + or spaces. + , spaces and dashes are stripped automatically.',
+					'Phone number in international format (digits only; +, spaces and dashes are stripped automatically) or a Business-Scoped User ID (BSUID, e.g. BR.13491208655302741918) for users whose phone number is hidden. The format is detected automatically.',
 				displayOptions: {
 					show: {
 						resource: ['message'],
@@ -346,13 +346,13 @@ export class Dialog360 implements INodeType {
 				if (resource === 'account' && operation === 'getHealthStatus') {
 					responseData = await dialog360ApiRequest.call(this, 'GET', '/health_status');
 				} else if (resource === 'message') {
-					const to = normalizePhone(this.getNodeParameter('to', i) as string);
+					const recipient = recipientFields(this.getNodeParameter('to', i) as string);
 
 					if (operation === 'sendText') {
 						responseData = await dialog360ApiRequest.call(this, 'POST', '/messages', {
 							messaging_product: 'whatsapp',
 							recipient_type: 'individual',
-							to,
+							...recipient,
 							type: 'text',
 							text: {
 								body: this.getNodeParameter('body', i) as string,
@@ -373,7 +373,7 @@ export class Dialog360 implements INodeType {
 						responseData = await dialog360ApiRequest.call(this, 'POST', '/messages', {
 							messaging_product: 'whatsapp',
 							recipient_type: 'individual',
-							to,
+							...recipient,
 							type: mediaType,
 							[mediaType]: media,
 						});
@@ -405,7 +405,7 @@ export class Dialog360 implements INodeType {
 						responseData = await dialog360ApiRequest.call(this, 'POST', '/messages', {
 							messaging_product: 'whatsapp',
 							recipient_type: 'individual',
-							to,
+							...recipient,
 							type: 'template',
 							template,
 						});

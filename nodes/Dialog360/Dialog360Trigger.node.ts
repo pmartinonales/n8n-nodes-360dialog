@@ -61,6 +61,13 @@ export class Dialog360Trigger implements INodeType {
 			},
 			{
 				displayName:
+					'Users can hide their phone number behind a WhatsApp username. Key conversations on the always-present “fromUserId” (Business-Scoped User ID); treat “from” and “waId” as optional. A “system” event with “newUserId” means the user changed phone numbers and stored user IDs must be remapped.',
+				name: 'bsuidNotice',
+				type: 'notice',
+				default: '',
+			},
+			{
+				displayName:
 					'360dialog delivers events to a single webhook URL per number. Activating this workflow points that webhook at n8n; the previous URL is restored when the workflow is deactivated.',
 				name: 'webhookNotice',
 				type: 'notice',
@@ -162,12 +169,29 @@ export class Dialog360Trigger implements INodeType {
 
 					const flat: IDataObject = {
 						messageId,
+						// Only present when the sender's phone is visible to this
+						// business. Users can hide their phone behind a username —
+						// key conversations on fromUserId, not on from/waId.
 						from: msg.from,
 						waId: contact.wa_id,
+						// Business-Scoped User ID: always present, stable per
+						// business portfolio (regenerated only on phone change).
+						fromUserId: msg.from_user_id,
+						userId: contact.user_id,
+						parentUserId: contact.parent_user_id,
+						username: profile.username,
 						contactName: profile.name,
 						timestamp: epochToIso(msg.timestamp),
 						type: msg.type,
 					};
+					// Phone change: all BSUIDs for this user were regenerated. The
+					// old one returns error 131009 forever — remap stored ids.
+					const system = msg.system as IDataObject | undefined;
+					if (system) {
+						flat.systemBody = system.body;
+						flat.oldUserId = system.user_id;
+						flat.newUserId = system.new_user_id;
+					}
 					const text = msg.text as IDataObject | undefined;
 					if (text) {
 						flat.text = text.body;
