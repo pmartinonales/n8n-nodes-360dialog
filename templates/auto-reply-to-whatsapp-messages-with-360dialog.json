@@ -1,0 +1,84 @@
+{
+  "name": "Send automatic WhatsApp text replies with 360dialog",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Send automatic WhatsApp text replies with 360dialog\n\n### Who's it for\nAnyone running WhatsApp on the [360dialog](https://www.360dialog.com/) Messaging API who wants to reply automatically to every incoming message — support inboxes, lead capture, or as a starting point for a WhatsApp chatbot.\n\n### How it works\n1. **Message Received** fires whenever a WhatsApp user sends a message to your 360dialog number.\n2. **Send Text Message** replies to that user with the text “Hey from n8n, by 360dialog”.\n\nThe reply is addressed to the sender's **Business-Scoped User ID** (`fromUserId`), which is always present in the trigger output — even when the user hides their phone number behind a WhatsApp username. The trigger also filters out outbound echoes and duplicate webhook deliveries, so the workflow never replies to itself.\n\n### How to set up\n1. Install the community node package `@pmartino/n8n-nodes-360dialog` (Settings → Community Nodes).\n2. Create a **360dialog API** credential with the API key from your [360dialog Hub](https://hub.360dialog.com/) and select it on both nodes.\n3. Activate the workflow — the trigger registers the webhook with 360dialog automatically.\n4. Send a WhatsApp message to your business number and watch the reply arrive.\n\n### Requirements\n- A 360dialog Messaging API account with an API key\n- The `@pmartino/n8n-nodes-360dialog` community node package\n\n### Good to know\n360dialog delivers events to a single webhook URL per number. Activating this workflow points that webhook at n8n; the previous URL is restored when the workflow is deactivated.\n\n### How to customize\n- Change the reply text in **Send Text Message**, or switch the operation to send media or an approved template message.\n- Add an AI Agent or Switch node between the two steps to route or generate replies based on `{{ $json.text }}`.",
+        "height": 960,
+        "width": 520
+      },
+      "id": "0f4c6a2e-1b7d-4e7a-9c3f-5a8b2d6e4f10",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-780, -180]
+    },
+    {
+      "parameters": {
+        "content": "### 1. Listen for incoming messages\nFires on every inbound WhatsApp message and outputs a flat item with `fromUserId` (the sender's Business-Scoped User ID), `text`, `contactName` and more.",
+        "height": 400,
+        "width": 320,
+        "color": 7
+      },
+      "id": "2a9d5c1f-6e3b-4f82-8d71-9c0e4b7a3d21",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-180, -80]
+    },
+    {
+      "parameters": {
+        "content": "### 2. Reply to the sender\nSends “Hey from n8n, by 360dialog” back to the sender, using the `fromUserId` from the trigger as the recipient — this works even when the sender hides their phone number.",
+        "height": 400,
+        "width": 320,
+        "color": 7
+      },
+      "id": "7b1e8f4a-2c5d-4a96-b3e8-1f6d9a0c5e32",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [200, -80]
+    },
+    {
+      "parameters": {
+        "event": "messageReceived"
+      },
+      "id": "c3f7a1d9-8e2b-4c60-a5f4-7d1b3e9c8a43",
+      "name": "Message Received",
+      "type": "@pmartino/n8n-nodes-360dialog.dialog360Trigger",
+      "typeVersion": 1,
+      "position": [-100, 120],
+      "webhookId": "b5e2c8a1-4f7d-4b39-9a6e-3c8f1d2b7e54"
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "sendText",
+        "recipient": "={{ $json.fromUserId }}",
+        "body": "Hey from n8n, by 360dialog"
+      },
+      "id": "9d4b7e2c-5a1f-4d83-b6c9-8e0a3f5d1c65",
+      "name": "Send Text Message",
+      "type": "@pmartino/n8n-nodes-360dialog.dialog360",
+      "typeVersion": 1,
+      "position": [280, 120]
+    }
+  ],
+  "connections": {
+    "Message Received": {
+      "main": [
+        [
+          {
+            "node": "Send Text Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
