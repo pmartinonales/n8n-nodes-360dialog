@@ -1,5 +1,5 @@
 {
-	"node": "n8n-nodes-base.dialog360",
+	"node": "@pmartino/n8n-nodes-360dialog.dialog360",
 	"nodeVersion": "1.0",
 	"codexVersion": "1.0",
 	"categories": ["Communication"],

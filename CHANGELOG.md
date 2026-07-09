@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.0
+
+- Fixed the codex `node` field prefix in both node JSON files to match the npm package name (`@pmartino/n8n-nodes-360dialog.*`), required for n8n Cloud verification.
+- Updated the node/credential icon to the official 360dialog logo.
+
 ## 0.2.0
 
 - First release published via GitHub Actions with npm provenance (required for n8n Cloud verification).
